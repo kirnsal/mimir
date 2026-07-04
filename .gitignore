@@ -1,0 +1,50 @@
+# --- Secrets & env ---
+.env
+.env.*
+*.key
+*.pem
+secrets/
+.anthropic
+.claude/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Cognee / local stores (do not commit graph/vector data) ---
+.cognee/
+cognee_system/
+*.lance/
+*.kuzu/
+*.sqlite
+*.db
+data/
+.data/
+
+# --- Benchmark artifacts (large/regenerable) ---
+runs/
+bench/results/
+*.jsonl.gz
+snapshots/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- SAFETY: research & planning live in the PARENT dir and must NEVER enter this repo.
+# This repo root is the only thing tracked. Do not copy PRD.md, ideation.md,
+# *research*, *report*, harness_research_bible.md, or any Docs/ here.

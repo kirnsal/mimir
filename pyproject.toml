@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mimir"
+version = "0.0.1"
+description = "A developer-facing memory layer for AI agents (MCP server). In development."
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+mcp = ["mcp>=1.0"]
+cognee = ["cognee>=1.2"]
+
+[project.scripts]
+mimir = "mimir.cli:main"
+mimir-hook = "mimir.cli:hook_main"
+mimir-serve = "mimir.cli:serve_main"
+
+[tool.setuptools.packages.find]
+include = ["mimir*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
