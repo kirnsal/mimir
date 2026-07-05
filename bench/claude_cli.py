@@ -34,8 +34,12 @@ def _resolve_bin() -> str:
 
 def _subprocess_runner(prompt: str, timeout: int) -> str:
     """Call the real CLI. Raises on failure with the CLI's own message (loud AND legible)."""
+    args = [_resolve_bin(), "-p", "--output-format", "json"]
+    model = os.environ.get("MIMIR_CLAUDE_MODEL")
+    if model:                                  # pin the solver model for a benchmark (e.g. sonnet)
+        args += ["--model", model]
     proc = subprocess.run(
-        [_resolve_bin(), "-p", "--output-format", "json"],
+        args,
         input=prompt, capture_output=True, text=True,
         timeout=timeout,
     )
