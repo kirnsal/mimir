@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mimir — Prove It Scoreboard</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #131a22; --ink: #e6edf3; --muted: #8b98a5;
+    --line: #223140; --cold: #f2545b; --naive: #e0a458; --warm: #35c07f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    padding: 48px 32px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 32px; }
+  .chip {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 12px; font-size: 13px; color: var(--muted);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px; margin-bottom: 24px;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 0 0 20px; }
+  .bar-row { display: grid; grid-template-columns: 190px 1fr 64px; align-items: center;
+    gap: 16px; margin-bottom: 18px; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-label { font-size: 14px; }
+  .track { position: relative; height: 26px; background: #0c1219;
+    border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .fill { height: 100%; width: 0; border-radius: 7px 0 0 7px;
+    transition: width 1100ms cubic-bezier(.2,.7,.2,1); }
+  .band { position: absolute; top: 0; bottom: 0; background: rgba(255,255,255,.14);
+    border-left: 1px solid rgba(255,255,255,.4); border-right: 1px solid rgba(255,255,255,.4); }
+  .pct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; color: var(--muted); font-family: ui-monospace, monospace; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  .cell { display: inline-block; min-width: 44px; padding: 3px 8px; border-radius: 6px; font-size: 14px; }
+  .pass { background: rgba(53,192,127,.16); color: var(--warm); }
+  .fail { background: rgba(242,84,91,.14); color: var(--cold); }
+  .mixed { background: rgba(224,164,88,.16); color: var(--naive); }
+  .lift { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  .lift b { color: var(--warm); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mimir — does memory <em>actually</em> help?</h1>
+  <p class="sub">Same agent, same tasks. The only variable is memory.</p>
+  <div class="chips" id="chips"></div>
+
+  <div class="panel">
+    <h2>Task success rate</h2>
+    <div id="bars"></div>
+    <div class="lift" id="lift"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Per-task pass / fail</h2>
+    <table id="grid"></table>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+  var R = window.RESULTS;
+  var COLORS = { cold: getVar('--cold'), naive: getVar('--naive'), warm: getVar('--warm') };
+  function getVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+  function signed(x) { return (x >= 0 ? '+' : '') + pct(x); }
+
+  // chips
+  document.getElementById('chips').innerHTML =
+    chip('model', R.model === 'sonnet' ? 'Sonnet 5' : R.model) +
+    chip('tasks', R.tasks.length) +
+    chip('repeats', R.repeats) +
+    chip('seed', R.seed);
+  function chip(k, v) { return '<span class="chip">' + k + ' <b>' + v + '</b></span>'; }
+
+  // bars
+  var bars = document.getElementById('bars');
+  R.arms.forEach(function (a) {
+    var row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML =
+      '<div class="bar-label">' + a.label + '</div>' +
+      '<div class="track"><div class="fill" style="background:' + COLORS[a.key] + '"></div>' +
+      '<div class="band" style="left:' + pct(a.min) + ';width:' + pct(a.max - a.min) + '"></div></div>' +
+      '<div class="pct">' + pct(a.success_rate) + '</div>';
+    bars.appendChild(row);
+    // animate after paint
+    var fill = row.querySelector('.fill');
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { fill.style.width = pct(a.success_rate); });
+    });
+  });
+
+  // lift line
+  document.getElementById('lift').innerHTML =
+    'Lift vs. no memory: <b>' + signed(R.lift.cold_to_warm) + '</b> &nbsp;·&nbsp; ' +
+    'vs. ungated memory: <b>' + signed(R.lift.naive_to_warm) + '</b>';
+
+  // grid
+  var grid = document.getElementById('grid');
+  var head = '<tr><th>task</th>' + R.arms.map(function (a) {
+    return '<th>' + a.key.toUpperCase() + '</th>'; }).join('') + '</tr>';
+  var rows = R.tasks.map(function (t) {
+    return '<tr><td>' + t.id + '</td>' + R.arms.map(function (a) {
+      return '<td>' + cell(t[a.key], R.repeats) + '</td>'; }).join('') + '</tr>';
+  }).join('');
+  grid.innerHTML = head + rows;
+  function cell(k, n) {
+    var cls = k === n ? 'pass' : (k === 0 ? 'fail' : 'mixed');
+    var txt = n > 1 ? (k + '/' + n) : (k === 1 ? '✓' : '✗');
+    return '<span class="cell ' + cls + '">' + txt + '</span>';
+  }
+</script>
+</body>
+</html>

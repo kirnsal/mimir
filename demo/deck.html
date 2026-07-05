@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mimir — Demo Deck</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #131a22; --panel2: #0c1219; --ink: #e6edf3; --muted: #8b98a5;
+    --line: #223140; --cold: #f2545b; --naive: #e0a458; --warm: #35c07f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); overflow: hidden;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .ic { width: 1em; height: 1em; display: inline-block; vertical-align: -0.14em;
+    fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  #progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--warm);
+    width: 0; transition: width 420ms cubic-bezier(.2,.7,.2,1); z-index: 40; }
+
+  /* persistent brand + hint */
+  .brandbar { position: fixed; top: 15px; left: 22px; display: flex; align-items: center; gap: 8px;
+    z-index: 40; transition: opacity 300ms ease; }
+  .brandbar .ic { font-size: 19px; color: var(--warm); }
+  .brandbar .wm { font-weight: 650; font-size: 15px; letter-spacing: .01em; color: var(--ink); }
+  body[data-slide="0"] .brandbar { opacity: 0; }
+  .hint { position: fixed; top: 17px; right: 22px; color: #4a5a6a; font-size: 12px; z-index: 40; }
+  .hint b { color: #7f8f9f; }
+
+  .stage { position: fixed; inset: 0; }
+  .slide {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; text-align: center;
+    padding: 5vh 8vw 104px; opacity: 0; transform: translateY(14px) scale(.99);
+    transition: opacity 420ms ease, transform 420ms ease; pointer-events: none;
+  }
+  .slide.active { opacity: 1; transform: none; pointer-events: auto; }
+
+  .kicker { display: inline-flex; align-items: center; gap: 9px; color: var(--muted);
+    font-size: clamp(11px, 1.3vw, 14px); letter-spacing: .14em; text-transform: uppercase;
+    margin-bottom: 3vh; }
+  .kicker .ic { font-size: 16px; color: var(--warm); }
+
+  h1 { font-size: clamp(30px, 6vw, 74px); line-height: 1.02; letter-spacing: -.03em; font-weight: 700; }
+  h2 { font-size: clamp(24px, 4.2vw, 50px); line-height: 1.08; letter-spacing: -.02em; font-weight: 650; }
+  .lede { font-size: clamp(16px, 2.1vw, 24px); line-height: 1.5; color: #c6d0da; max-width: 58ch; margin-top: 3vh; }
+  .lede .dim { color: var(--muted); }
+  .punch { color: var(--warm); font-weight: 650; }
+  .strike { color: var(--cold); text-decoration: line-through; text-decoration-thickness: 2px; }
+
+  /* brand lockup (slide 1) */
+  .brandlock { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 3.4vh; }
+  .brandlock .row { display: flex; align-items: center; gap: 13px; }
+  .brandlock .ic { font-size: clamp(34px, 5vw, 46px); color: var(--warm); }
+  .brandlock .name { font-size: clamp(30px, 5vw, 48px); font-weight: 700; letter-spacing: -.02em; }
+  .brandlock .tl { color: var(--muted); font-size: clamp(13px, 1.6vw, 17px); letter-spacing: .02em; }
+
+  /* slide 1 pair */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 4vh; width: min(860px, 84vw); }
+  .pcard { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px 22px; text-align: left; }
+  .pcard .tag { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .pcard .body { margin-top: 10px; font-size: clamp(15px, 1.8vw, 19px); color: #d6dee7; }
+  .pcard .mark { display: flex; align-items: center; gap: 9px; font-size: 22px; margin-top: 14px; font-weight: 700; }
+  .pcard .mark .ic { font-size: 24px; }
+  .pcard.good { border-color: rgba(53,192,127,.4); } .pcard.good .mark { color: var(--warm); }
+  .pcard.bad  { border-color: rgba(242,84,91,.4); }  .pcard.bad .mark { color: var(--cold); }
+
+  /* slide 2 pipeline */
+  .pipe { display: flex; align-items: stretch; margin-top: 5vh; width: min(940px, 90vw); }
+  .node { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 16px; position: relative; opacity: 0; transform: translateY(10px);
+    transition: opacity 480ms ease, transform 480ms ease; }
+  .active .node { opacity: 1; transform: none; }
+  .active .node.n1 { transition-delay: 120ms; } .active .node.n2 { transition-delay: 420ms; } .active .node.n3 { transition-delay: 820ms; }
+  .node .ni { font-size: 26px; color: var(--warm); margin-bottom: 8px; }
+  .node .step { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .node .name { font-size: clamp(18px, 2.4vw, 26px); font-weight: 650; margin: 4px 0 6px; }
+  .node .desc { font-size: 14px; color: #b7c1cb; line-height: 1.4; }
+  .arrow { align-self: center; color: #45586a; padding: 0 10px; opacity: 0; transition: opacity 420ms ease; }
+  .arrow .ic { font-size: 24px; }
+  .active .arrow { opacity: 1; } .active .arrow.a1 { transition-delay: 340ms; } .active .arrow.a2 { transition-delay: 740ms; }
+  .gate { position: absolute; top: -12px; right: 14px; background: var(--panel2); border: 1px solid var(--warm);
+    color: var(--warm); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; }
+  .earn { margin-top: 4vh; color: var(--muted); font-size: clamp(14px, 1.7vw, 19px); }
+  .earn b { color: var(--ink); font-weight: 600; }
+
+  /* slide 3 scoreboard */
+  .board { width: min(900px, 92vw); }
+  .board .chip { display: inline-block; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 14px; font-size: 13px; color: var(--muted); margin-bottom: 3vh; }
+  .board .chip b { color: var(--ink); }
+  .bar-row { display: grid; grid-template-columns: 210px 1fr 74px; align-items: center; gap: 18px; margin-bottom: 16px; text-align: left; }
+  .bar-label { font-size: clamp(14px,1.7vw,18px); }
+  .track { position: relative; height: 30px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .fill { height: 100%; width: 0; border-radius: 7px 0 0 7px; transition: width 1100ms cubic-bezier(.2,.7,.2,1); }
+  .band { position: absolute; top: 0; bottom: 0; background: rgba(255,255,255,.14);
+    border-left: 1px solid rgba(255,255,255,.4); border-right: 1px solid rgba(255,255,255,.4); }
+  .pct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-size: clamp(15px,1.9vw,20px); }
+  .lift { color: var(--muted); font-size: clamp(13px,1.6vw,16px); margin: 10px 0 3vh; text-align: left; }
+  .lift b { color: var(--warm); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th:first-child, td:first-child { text-align: left; color: var(--muted); font-family: ui-monospace, monospace; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  tr.hl td { background: rgba(224,164,88,.07); }
+  tr.hl td:first-child { color: var(--naive); }
+  .cellv { display: inline-block; min-width: 46px; padding: 4px 9px; border-radius: 6px; }
+  .pass { background: rgba(53,192,127,.16); color: var(--warm); }
+  .fail { background: rgba(242,84,91,.14); color: var(--cold); }
+  .note-inline { margin-top: 2.4vh; font-size: 13px; color: #6f7d8b; }
+  .note-inline b { color: var(--naive); }
+
+  /* slide 4 cards */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 5vh; width: min(960px, 92vw); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; text-align: left; }
+  .card .ci { font-size: 26px; color: var(--warm); margin-bottom: 12px; }
+  .card .ct { font-size: clamp(16px,2vw,20px); font-weight: 650; margin-bottom: 8px; }
+  .card .cd { font-size: 14px; color: #b7c1cb; line-height: 1.5; }
+  .flow { margin-top: 4vh; display: flex; align-items: center; justify-content: center; gap: 10px;
+    color: var(--muted); font-family: ui-monospace, monospace; font-size: clamp(12px,1.5vw,15px); flex-wrap: wrap; }
+  .flow .box { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  .flow .score { color: var(--warm); border-color: rgba(53,192,127,.5); }
+  .flow .ic { font-size: 15px; color: #45586a; }
+
+  /* slide 5 close */
+  .receipt { margin-top: 5vh; width: min(560px, 84vw); background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .rrow { display: grid; grid-template-columns: 130px 1fr 56px; align-items: center; gap: 14px; margin-bottom: 10px; text-align: left; }
+  .rrow:last-child { margin-bottom: 0; }
+  .rrow .rl { font-size: 13px; color: var(--muted); }
+  .rtrack { height: 20px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .rfill { height: 100%; width: 0; transition: width 900ms cubic-bezier(.2,.7,.2,1); }
+  .rpct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; }
+  .sig { margin-top: 3.4vh; display: inline-flex; align-items: center; gap: 8px; color: #5c6a78; font-size: 13px; letter-spacing: .04em; }
+  .sig .ic { font-size: 15px; color: var(--warm); }
+
+  /* controls */
+  .nav { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; z-index: 40; }
+  .dots { display: flex; gap: 9px; }
+  .dots button { width: 9px; height: 9px; border-radius: 50%; border: none; cursor: pointer; background: #2c3d4d; padding: 0; transition: background 200ms, transform 200ms; }
+  .dots button.on { background: var(--warm); transform: scale(1.25); }
+  .arrowbtn { background: var(--panel); border: 1px solid var(--line); color: var(--ink); width: 38px; height: 38px;
+    border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 160ms, border-color 160ms; }
+  .arrowbtn .ic { font-size: 18px; } .arrowbtn:hover { background: #1a232e; border-color: #33475a; }
+  .counter { position: fixed; bottom: 26px; right: 26px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; z-index: 40; }
+
+  /* speaker notes */
+  #notes { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(6,9,13,.96); border-top: 1px solid var(--line);
+    padding: 16px 24px 20px; z-index: 50; transform: translateY(101%); transition: transform 300ms ease; max-height: 42vh; overflow: auto; }
+  #notes.show { transform: none; }
+  #notes .nk { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--warm); margin-bottom: 8px; }
+  #notes .nt { font-size: clamp(15px,1.7vw,18px); line-height: 1.55; color: #d6dee7; max-width: 90ch; }
+  #notes .nt em { color: var(--warm); font-style: normal; font-weight: 600; }
+
+  @media (max-width: 720px) {
+    .pair, .cards { grid-template-columns: 1fr; }
+    .pipe { flex-direction: column; } .arrow { transform: rotate(90deg); padding: 6px 0; }
+    .bar-row { grid-template-columns: 120px 1fr 56px; gap: 10px; }
+  }
+</style>
+</head>
+<body data-slide="0">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 7 7 8 4-1 7-3.5 7-8V6l-7-3z"/><path d="m8.6 12 2.3 2.3L15.5 10"/></symbol>
+    <symbol id="ic-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="ic-flow" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7.2 12h2.6"/><path d="M14.2 12h2.6"/></symbol>
+    <symbol id="ic-chart" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M6 21v-6"/><path d="M12 21v-10"/><path d="M18 21v-14"/></symbol>
+    <symbol id="ic-badge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.4 2.4L16 9"/></symbol>
+    <symbol id="ic-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.4 2.4L16 9"/></symbol>
+    <symbol id="ic-loop" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.36"/><path d="M21 4v5h-5"/></symbol>
+    <symbol id="ic-capture" viewBox="0 0 24 24"><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><path d="M12 4v11"/><path d="m8 11 4 4 4-4"/></symbol>
+    <symbol id="ic-funnel" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"/></symbol>
+    <symbol id="ic-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></symbol>
+    <symbol id="ic-spark" viewBox="0 0 24 24"><path d="M12 3l2.2 6.3L20.5 12l-6.3 2.2L12 21l-2.2-6.3L3.5 12l6.3-2.2z"/></symbol>
+    <symbol id="ic-activity" viewBox="0 0 24 24"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></symbol>
+    <symbol id="ic-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></symbol>
+  </defs>
+</svg>
+
+<div id="progress"></div>
+<div class="brandbar"><svg class="ic"><use href="#ic-shield"/></svg><span class="wm">Mimir</span></div>
+<div class="hint">press <b>&larr;</b> <b>&rarr;</b> to move · <b>N</b> notes · <b>F</b> full screen</div>
+
+<div class="stage" id="stage">
+
+  <!-- 1 · HOOK -->
+  <section class="slide" data-notes="AI coding agents are brilliant and amnesiac. They solve a bug, and tomorrow they make the exact same mistake — because nothing they learn survives the session. Most agent-memory tools just store more text and hope it helps. We wanted memory that <em>proves</em> it helps.">
+    <div class="brandlock">
+      <div class="row"><svg class="ic"><use href="#ic-shield"/></svg><span class="name">Mimir</span></div>
+      <div class="tl">agent memory that has to prove it helps</div>
+    </div>
+    <h1>Brilliant.<br>And <span class="strike">amnesiac</span>.</h1>
+    <div class="pair">
+      <div class="pcard good"><div class="tag">Today</div><div class="body">The agent solves a tricky bug.</div><div class="mark"><svg class="ic"><use href="#ic-check"/></svg> fixed</div></div>
+      <div class="pcard bad"><div class="tag">Tomorrow</div><div class="body">New session — it makes the exact same mistake.</div><div class="mark"><svg class="ic"><use href="#ic-loop"/></svg> again</div></div>
+    </div>
+    <p class="lede"><span class="dim">Most "agent memory" just stores text and hopes.</span> We built <span class="punch">memory that proves it helps.</span></p>
+  </section>
+
+  <!-- 2 · WHAT IS MIMIR -->
+  <section class="slide" data-notes="Mimir watches an agent fail, distills the failure into a specific, signed lesson, and serves it back later — but only if that lesson clears a confidence gate. Every lesson has to earn its place.">
+    <div class="kicker"><svg class="ic"><use href="#ic-flow"/></svg> What is Mimir</div>
+    <h2>Watch a failure &rarr; distill a signed lesson &rarr;<br>serve it back only if it clears the gate.</h2>
+    <div class="pipe">
+      <div class="node n1"><div class="ni"><svg class="ic"><use href="#ic-capture"/></svg></div><div class="step">Capture</div><div class="name">Remember</div><div class="desc">Log the failure as an episode — action, context, consequence.</div></div>
+      <div class="arrow a1"><svg class="ic"><use href="#ic-arrow"/></svg></div>
+      <div class="node n2"><div class="ni"><svg class="ic"><use href="#ic-funnel"/></svg></div><div class="step">Consolidate</div><div class="name">Distill</div><div class="desc">A judge extracts one specific, HMAC-signed lesson.</div></div>
+      <div class="arrow a2"><svg class="ic"><use href="#ic-arrow"/></svg></div>
+      <div class="node n3"><span class="gate">confidence gate</span><div class="ni"><svg class="ic"><use href="#ic-shield"/></svg></div><div class="step">Recall</div><div class="name">Serve</div><div class="desc">Gated retrieval — only trusted lessons reach the agent.</div></div>
+    </div>
+    <p class="earn">Every lesson has to <b>earn its place.</b></p>
+  </section>
+
+  <!-- 3 · THE PROOF -->
+  <section class="slide" data-notes="Same model — Sonnet 5. Same three tasks. The <em>only</em> variable is memory. Cold, with no memory, the agent fails everything — zero percent. These are bugs whose fix depends on an API contract the model can't know from training. Turn Mimir on, gated recall — a hundred percent. Now the honest part: the middle row, NAIVE, is memory <em>without</em> the gate — we deliberately poisoned it. On most tasks Sonnet ignores the bad advice. But on t-unit it gets fooled — zero out of three. Only Mimir's gate catches the poison and recovers it. That's the difference between storing memory and trusting the right memory.">
+    <div class="kicker"><svg class="ic"><use href="#ic-chart"/></svg> The proof</div>
+    <h2 style="margin-bottom: 2.4vh;">Same model. Same tasks. Only memory changes.</h2>
+    <div class="board">
+      <div class="chip">model <b>Sonnet 5</b> · tasks <b>3</b> · repeats <b>3</b> · seed <b>0</b></div>
+      <div id="bars"></div>
+      <div class="lift" id="lift"></div>
+      <table id="grid"></table>
+      <div class="note-inline">The proof is <b>t-unit</b>: poison fools ungated memory (NAIVE 0/3) — the gate recovers it (WARM 3/3).</div>
+    </div>
+  </section>
+
+  <!-- 4 · WHY IT'S REAL -->
+  <section class="slide" data-notes="This isn't a mockup. The verifier actually executes the model's code against hidden asserts — a pass means the bug is genuinely fixed. The tasks use novel API contracts absent from training data, so the model can't fake them. And we run three times with a noise band, so a lift smaller than the band gets reported as noise, not a win.">
+    <div class="kicker"><svg class="ic"><use href="#ic-shield"/></svg> Why it's real</div>
+    <h2>Not a mockup. A verifier.</h2>
+    <div class="cards">
+      <div class="card"><div class="ci"><svg class="ic"><use href="#ic-terminal"/></svg></div><div class="ct">It runs the code</div><div class="cd">The model's fix is executed against hidden asserts. A pass means the bug is actually fixed — not a keyword match.</div></div>
+      <div class="card"><div class="ci"><svg class="ic"><use href="#ic-spark"/></svg></div><div class="ct">Novel APIs</div><div class="cd">Fixes hinge on API contracts absent from any training data. The model can't fake them cold — the lesson supplies the fact.</div></div>
+      <div class="card"><div class="ci"><svg class="ic"><use href="#ic-activity"/></svg></div><div class="ct">Noise band</div><div class="cd">Three seeded runs per arm. A lift smaller than the band is reported as noise, not a result.</div></div>
+    </div>
+    <div class="flow">
+      <span class="box">broken code</span> <svg class="ic"><use href="#ic-arrow"/></svg> <span class="box">exec()</span> <svg class="ic"><use href="#ic-arrow"/></svg> <span class="box">hidden asserts</span> <svg class="ic"><use href="#ic-arrow"/></svg> <span class="box score">SCORE 1.0</span>
+    </div>
+  </section>
+
+  <!-- 5 · CLOSE -->
+  <section class="slide" data-notes="Memory you can't tie to an outcome is just storage. Mimir is memory that has to prove it helps — and here's the receipt.">
+    <div class="kicker"><svg class="ic"><use href="#ic-badge"/></svg> Mimir</div>
+    <h1 style="max-width: 18ch;">Memory you can't tie to an outcome is <span class="strike">just storage</span>.</h1>
+    <p class="lede">Mimir is <span class="punch">memory that has to prove it helps.</span> Here's the receipt.</p>
+    <div class="receipt">
+      <div class="rrow"><span class="rl">No memory</span><div class="rtrack"><div class="rfill" data-w="0" style="background:var(--cold)"></div></div><span class="rpct">0%</span></div>
+      <div class="rrow"><span class="rl">With Mimir</span><div class="rtrack"><div class="rfill" data-w="100" style="background:var(--warm)"></div></div><span class="rpct">100%</span></div>
+    </div>
+    <p class="sig"><svg class="ic"><use href="#ic-shield"/></svg> Mimir · agent memory on Cognee · verified on Claude Sonnet 5</p>
+  </section>
+
+</div>
+
+<div class="nav">
+  <button class="arrowbtn" id="prev" aria-label="previous"><svg class="ic" style="transform:scaleX(-1)"><use href="#ic-arrow"/></svg></button>
+  <div class="dots" id="dots"></div>
+  <button class="arrowbtn" id="next" aria-label="next"><svg class="ic"><use href="#ic-arrow"/></svg></button>
+</div>
+<div class="counter" id="counter">1 / 5</div>
+
+<div id="notes"><div class="nk">speaker note</div><div class="nt" id="notesText"></div></div>
+
+<script>
+  var RESULTS = {
+    arms: [
+      { key:"cold",  label:"COLD (no memory)",    rate:0.0,   min:0.0,   max:0.0,   color:"var(--cold)" },
+      { key:"naive", label:"NAIVE (ungated)",     rate:0.667, min:0.667, max:0.667, color:"var(--naive)" },
+      { key:"warm",  label:"WARM (Mimir, gated)", rate:1.0,   min:1.0,   max:1.0,   color:"var(--warm)" }
+    ],
+    tasks: [
+      { id:"t-flush", cold:0, naive:3, warm:3, hl:false },
+      { id:"t-page",  cold:0, naive:3, warm:3, hl:false },
+      { id:"t-unit",  cold:0, naive:0, warm:3, hl:true  }
+    ],
+    lift: { cold_to_warm:1.0, naive_to_warm:0.333 }
+  };
+
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var N = slides.length, cur = 0;
+  var dotsWrap = document.getElementById('dots');
+  var counter = document.getElementById('counter');
+  var progress = document.getElementById('progress');
+  var notes = document.getElementById('notes');
+  var notesText = document.getElementById('notesText');
+  var notesOn = false;
+
+  slides.forEach(function (s, i) {
+    var b = document.createElement('button');
+    b.setAttribute('aria-label', 'go to slide ' + (i + 1));
+    b.addEventListener('click', function () { go(i); });
+    dotsWrap.appendChild(b);
+  });
+  var dots = Array.prototype.slice.call(dotsWrap.children);
+
+  function pct(x) { return Math.round(x * 100) + '%'; }
+  function signed(x) { return (x >= 0 ? '+' : '') + pct(x); }
+
+  function buildBoard() {
+    var bars = document.getElementById('bars');
+    bars.innerHTML = RESULTS.arms.map(function (a) {
+      return '<div class="bar-row"><div class="bar-label">' + a.label + '</div>' +
+        '<div class="track"><div class="fill" data-w="' + (a.rate * 100) + '" style="background:' + a.color + '"></div>' +
+        '<div class="band" style="left:' + pct(a.min) + ';width:' + pct(a.max - a.min) + '"></div></div>' +
+        '<div class="pct">' + pct(a.rate) + '</div></div>';
+    }).join('');
+    document.getElementById('lift').innerHTML =
+      'Lift vs. no memory: <b>' + signed(RESULTS.lift.cold_to_warm) + '</b> &nbsp;·&nbsp; vs. ungated memory: <b>' + signed(RESULTS.lift.naive_to_warm) + '</b>';
+    var g = document.getElementById('grid');
+    var head = '<tr><th>task</th><th>COLD</th><th>NAIVE</th><th>WARM</th></tr>';
+    g.innerHTML = head + RESULTS.tasks.map(function (t) {
+      function c(v) { return '<span class="cellv ' + (v === 3 ? 'pass' : 'fail') + '">' + v + '/3</span>'; }
+      return '<tr' + (t.hl ? ' class="hl"' : '') + '><td>' + t.id + '</td><td>' + c(t.cold) + '</td><td>' + c(t.naive) + '</td><td>' + c(t.warm) + '</td></tr>';
+    }).join('');
+  }
+  buildBoard();
+
+  function resetFills(slide) { slide.querySelectorAll('.fill, .rfill').forEach(function (f) { f.style.width = '0'; }); }
+  function animateFills(slide) {
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      slide.querySelectorAll('.fill, .rfill').forEach(function (f) { f.style.width = (f.getAttribute('data-w') || 0) + '%'; });
+    }); });
+  }
+
+  function go(i) {
+    if (i < 0) i = 0; if (i > N - 1) i = N - 1;
+    resetFills(slides[cur]);
+    cur = i;
+    document.body.dataset.slide = i;
+    slides.forEach(function (s, k) { s.classList.toggle('active', k === i); });
+    dots.forEach(function (d, k) { d.classList.toggle('on', k === i); });
+    counter.textContent = (i + 1) + ' / ' + N;
+    progress.style.width = (i / (N - 1) * 100) + '%';
+    notesText.innerHTML = slides[i].getAttribute('data-notes') || '';
+    animateFills(slides[i]);
+  }
+
+  document.getElementById('next').addEventListener('click', function () { go(cur + 1); });
+  document.getElementById('prev').addEventListener('click', function () { go(cur - 1); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(cur + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(cur - 1); }
+    else if (e.key === 'Home') { go(0); } else if (e.key === 'End') { go(N - 1); }
+    else if (e.key === 'n' || e.key === 'N') { notesOn = !notesOn; notes.classList.toggle('show', notesOn); }
+    else if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+      else { document.exitFullscreen && document.exitFullscreen(); }
+    }
+  });
+
+  go(0);
+</script>
+</body>
+</html>

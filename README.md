@@ -114,6 +114,19 @@ python -c "from bench.live import demo_band; demo_band(3)"  # live: real Claude 
 The live run prints each arm's mean success rate with a (min, max) noise band —
 a WARM−COLD lift smaller than the band is reported as noise, not a result.
 
+### Visual scoreboard (Sonnet 5)
+
+Run the three arms live against Sonnet 5 and render a self-contained page:
+
+```bash
+MIMIR_CLAUDE_MODEL=sonnet python -m bench.scoreboard --repeats 3
+open bench/scoreboard/index.html
+```
+
+`--repeats 3` draws 3×3 tasks per arm for a noise band (27 solver calls); use
+`--repeats 1` for a quick single run (9 calls). The page reads `data.js` and
+needs no server — open it directly and screen-record the bars filling in.
+
 ---
 
 ## MCP tools
