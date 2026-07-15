@@ -190,3 +190,53 @@ def test_consolidate_main_admits_nothing_with_one_episode_no_probe_injected(tmp_
 
     store = cli.build_store(lance_url=tmp_path / "lance.db", lessons_path=tmp_path / "lessons.json")
     assert store.active() == []  # fail-closed: no held-out evidence, nothing admitted
+
+
+def test_render_digest_sorts_by_confidence_descending():
+    import mimir.cli as cli
+    from mimir.models import Lesson
+
+    lessons = [Lesson(rule="low confidence rule", confidence=0.3, id="L1"),
+              Lesson(rule="high confidence rule", confidence=0.9, id="L2")]
+    digest = cli.render_digest(lessons)
+    assert digest.index("high confidence rule") < digest.index("low confidence rule")
+    assert "confidence: 0.90" in digest
+    assert "id: L2" in digest
+
+
+def test_render_digest_handles_no_active_lessons():
+    import mimir.cli as cli
+
+    assert "no active lessons" in cli.render_digest([])
+
+
+def test_export_main_requires_digest_flag():
+    import mimir.cli as cli
+
+    assert cli.export_main([]) == 2
+
+
+def test_export_main_prints_digest_from_store(tmp_path, monkeypatch, capsys):
+    pytest.importorskip("lancedb")
+    import mimir.cli as cli
+    from mimir.models import Lesson
+
+    monkeypatch.setattr(cli, "DEFAULT_LESSONS", tmp_path / "lessons.json")
+    monkeypatch.setattr(cli, "DEFAULT_LANCE", tmp_path / "lance.db")
+
+    store = cli.build_store()
+    store.add(Lesson(rule="pin tool versions before release", confidence=0.8, id="L1"))
+    cli.save_lessons(store, cli.DEFAULT_LESSONS)
+
+    assert cli.export_main(["--digest"]) == 0
+    out = capsys.readouterr().out
+    assert "pin tool versions before release" in out
+
+
+def test_main_dispatches_export_command(monkeypatch):
+    import mimir.cli as cli
+
+    calls = []
+    monkeypatch.setattr(cli, "export_main", lambda rest: calls.append(rest) or 0)
+    assert cli.main(["export", "--digest"]) == 0
+    assert calls == [["--digest"]]

@@ -8,6 +8,7 @@ Installed by `pip install mimir`:
                                  #   gated LESSONs and persist them (needs a live judge)
     mimir-serve                  # serve the MCP tool surface over stdio, backed by
                                  #   the Cognee/LanceDB LESSON store (pip install 'mimir[mcp,cognee]')
+    mimir export --digest        # print active lessons as a markdown digest to stdout
     mimir install-hook           # register mimir-hook into ~/.claude/settings.json
                                  #   (idempotent, backs up the old file)
     mimir install-hook --print   # just print the settings block to paste yourself
@@ -282,6 +283,29 @@ def serve_main(argv: Optional[list] = None) -> int:
     return 0
 
 
+def render_digest(lessons: list[Lesson]) -> str:
+    """Human-readable markdown snapshot of active lessons, sorted by confidence desc."""
+    if not lessons:
+        return "# Mimir digest\n\nno active lessons yet.\n"
+    lines = ["# Mimir digest", ""]
+    for lo in sorted(lessons, key=lambda lo: lo.confidence, reverse=True):
+        lines.append(f"- **{lo.rule}** (confidence: {lo.confidence:.2f}, id: {lo.id})")
+    return "\n".join(lines) + "\n"
+
+
+def export_main(argv: Optional[list] = None) -> int:
+    """`mimir export --digest` — markdown snapshot of active lessons, printed to stdout.
+    Redirect with `>` for a file; no new file-writing path (same stdout convention as
+    `install-hook --print`)."""
+    argv = argv or []
+    if "--digest" not in argv:
+        print("usage: mimir export --digest", file=sys.stderr)
+        return 2
+    store = build_store()
+    print(render_digest(store.active()))
+    return 0
+
+
 def main(argv: Optional[list] = None) -> int:
     """`mimir` — top-level dispatcher."""
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -305,6 +329,8 @@ def main(argv: Optional[list] = None) -> int:
         return consolidate_main(rest)
     if cmd == "serve":
         return serve_main(rest)
+    if cmd == "export":
+        return export_main(rest)
     if cmd == "hook":
         return hook_main(rest)
     print(f"unknown command: {cmd}\n{__doc__}", file=sys.stderr)
