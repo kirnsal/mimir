@@ -87,3 +87,14 @@ def test_snapshot_is_deterministic_and_order_independent():
     store_b.add(_lesson("y", id="L2", valid_from=FIXED_TS))
     store_b.add(_lesson("x", id="L1", valid_from=FIXED_TS))
     assert store_b.snapshot() == snap  # independent of insertion order
+
+
+def test_protect_and_unprotect_roundtrip():
+    store = InMemoryLessonStore()
+    lid = store.add(_lesson("never force-push shared branches"))
+
+    store.protect(lid)
+    assert store.get(lid).protected is True
+
+    store.unprotect(lid)
+    assert store.get(lid).protected is False

@@ -37,6 +37,7 @@ class Lesson:
     rule: str                                  # specific directive, not "be careful"
     confidence: float = 0.0                    # 0..1, moves only on scored evidence (FR3)
     status: str = ACTIVE                        # active | quarantined | retired | superseded
+    protected: bool = False                      # human-pinned: exempt from auto-supersede/quarantine
     supporting_episodes: list[str] = field(default_factory=list)
     contradicts: list[str] = field(default_factory=list)
     provenance: str = ""                        # who/what derived it (FR7 governance)

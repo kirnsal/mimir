@@ -58,6 +58,14 @@ class InMemoryLessonStore:
         lesson.status = RETIRED
         lesson.invalid_at = _now()
 
+    def protect(self, lesson_id: str) -> None:
+        """Pin a lesson: exempt from auto-supersede and circuit-breaker quarantine.
+        Human-set only (no CLI/MCP surface yet -- store API is the workflow for now)."""
+        self._require(lesson_id).protected = True
+
+    def unprotect(self, lesson_id: str) -> None:
+        self._require(lesson_id).protected = False
+
     def active(self) -> list[Lesson]:
         return [lo for lo in self._lessons.values()
                 if lo.status == ACTIVE and lo.invalid_at is None]

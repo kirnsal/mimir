@@ -75,9 +75,17 @@ Probe = Callable[[list[Lesson]], float]
 
 
 def epsilon_admit(lesson: Lesson, active: list[Lesson], probe: Probe,
-                  *, epsilon: float = EPSILON) -> bool:
-    """FR3: admit only if the held-out probe set improves by >= ε (counterfactual sufficiency)."""
-    baseline = probe(active)
+                  *, epsilon: float = EPSILON, baseline: float | None = None) -> bool:
+    """FR3: admit only if the held-out probe set improves by >= ε (counterfactual sufficiency).
+
+    `baseline` lets a caller reuse a `probe(active)` score across several candidate
+    lessons scored against the same unchanged active set — a real probe can be a live
+    LLM/solver call (`bench.claude_judge.make_solver_probe` costs 2x|held_out| calls
+    per invocation), so re-probing an unchanged baseline for every rejected candidate
+    wastes real calls. Left None, this recomputes it (unchanged standalone behaviour).
+    """
+    if baseline is None:
+        baseline = probe(active)
     improved = probe([*active, lesson])
     return improved - baseline >= epsilon
 
@@ -146,6 +154,8 @@ def circuit_breaker_sweep(store, observations: dict[str, list[Adoption]],
     """FR4: quarantine any active lesson whose adoption correlates with outcome regressions."""
     quarantined: list[str] = []
     for lesson in store.active():
+        if lesson.protected:
+            continue
         obs = observations.get(lesson.id, [])
         with_l = [o.outcome_score for o in obs if o.adopted]
         without = [o.outcome_score for o in obs if not o.adopted]
@@ -162,15 +172,26 @@ def consolidate(episodes: Iterable[Episode], store, judge: Judge, probe: Probe,
                 threshold: float = JUDGE_THRESHOLD) -> list[Lesson]:
     """Full slow path: EXTRACT -> ADMIT(ε-gate + HMAC) -> RESOLVE(contradiction) -> WRITE."""
     admitted: list[Lesson] = []
-    for lesson in extract(episodes, judge, threshold=threshold):
-        active = store.active()
-        if not epsilon_admit(lesson, active, probe, epsilon=epsilon):
+    candidates = extract(episodes, judge, threshold=threshold)
+    if not candidates:
+        return admitted
+
+    # probe(active) is invariant while the store is unmutated, so it's cached across
+    # candidates and only re-probed after an admit actually changes `active` (see
+    # epsilon_admit's docstring — matters when probe is a real, paid LLM/solver call).
+    active = store.active()
+    baseline = probe(active)
+    for lesson in candidates:
+        if not epsilon_admit(lesson, active, probe, epsilon=epsilon, baseline=baseline):
             continue
-        loser = next((a for a in active if detect_contradiction(a, lesson)), None)
+        loser = next((a for a in active if not a.protected and detect_contradiction(a, lesson)),
+                     None)
         lesson.citation = sign_citation(lesson, key)
         if loser is not None:
             store.supersede(loser.id, lesson)  # bi-temporal: loser kept, marked invalid
         else:
             store.add(lesson)
         admitted.append(lesson)
+        active = store.active()
+        baseline = probe(active)  # store mutated; refresh for the next candidate
     return admitted
