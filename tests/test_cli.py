@@ -358,9 +358,10 @@ def test_auto_consolidate_worker_main_calls_consolidate_then_finish_run(monkeypa
 
     calls = []
     monkeypatch.setattr(cli, "consolidate_main", lambda *a, **k: calls.append("consolidate") or 0)
-    monkeypatch.setattr(cli.auto_consolidate, "finish_run", lambda: calls.append("finish"))
+    monkeypatch.setattr(cli.auto_consolidate, "finish_run",
+                        lambda **kw: calls.append(("finish", kw.get("advance_baseline"))))
     assert cli._auto_consolidate_worker_main() == 0
-    assert calls == ["consolidate", "finish"]
+    assert calls == ["consolidate", ("finish", True)]
 
 
 def test_auto_consolidate_worker_main_still_finishes_when_consolidate_raises(monkeypatch):
@@ -372,13 +373,25 @@ def test_auto_consolidate_worker_main_still_finishes_when_consolidate_raises(mon
         raise RuntimeError("judge unreachable")
 
     monkeypatch.setattr(cli, "consolidate_main", _boom)
-    monkeypatch.setattr(cli.auto_consolidate, "finish_run", lambda: calls.append("finish"))
+    monkeypatch.setattr(cli.auto_consolidate, "finish_run",
+                        lambda **kw: calls.append(("finish", kw.get("advance_baseline"))))
     try:
         cli._auto_consolidate_worker_main()
         assert False, "the worker's own crash should propagate to its process exit code"
     except RuntimeError:
         pass
-    assert calls == ["finish"]  # cleanup still ran despite the crash
+    assert calls == [("finish", False)]  # cleanup still ran, baseline NOT advanced
+
+
+def test_auto_consolidate_worker_main_does_not_advance_baseline_on_nonzero_return(monkeypatch):
+    import mimir.cli as cli
+
+    calls = []
+    monkeypatch.setattr(cli, "consolidate_main", lambda *a, **k: 1)  # e.g. missing bench judge
+    monkeypatch.setattr(cli.auto_consolidate, "finish_run",
+                        lambda **kw: calls.append(("finish", kw.get("advance_baseline"))))
+    assert cli._auto_consolidate_worker_main() == 1
+    assert calls == [("finish", False)]
 
 
 def test_main_dispatches_auto_consolidate_worker_command(monkeypatch):

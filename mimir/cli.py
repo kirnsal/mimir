@@ -315,11 +315,17 @@ def _auto_consolidate_worker_main(argv: Optional[list] = None) -> int:
     """Spawned by auto_consolidate.maybe_trigger as a detached background process; not a
     user-facing command (deliberately absent from the module docstring/usage text). Runs
     the same consolidate_main() as `mimir consolidate`, then always updates the
-    auto-trigger state and releases the lock, even if consolidation itself raised."""
+    auto-trigger state and releases the lock, even if consolidation itself raised. Only
+    advances the failure-count baseline when consolidate_main actually returned success
+    (0) -- a nonzero return (e.g. the bench judge/probe couldn't be imported) or a raised
+    exception means no real work happened, so the accumulated failures stay pending for
+    the next eligible retry instead of being silently forgotten."""
+    rc = None
     try:
-        return consolidate_main()
+        rc = consolidate_main()
+        return rc
     finally:
-        auto_consolidate.finish_run()
+        auto_consolidate.finish_run(advance_baseline=(rc == 0))
 
 
 def serve_main(argv: Optional[list] = None) -> int:
@@ -387,6 +393,10 @@ def main(argv: Optional[list] = None) -> int:
             return 0
         print(install_hook())
         return 0
+    # ponytail: manual consolidate intentionally shares no lock with the auto-consolidate
+    # worker -- a manual run during an in-flight background run can race it (both write
+    # lessons.json, last-writer-wins). Low probability on a single-dev machine; add
+    # locking here if that stops being true.
     if cmd == "consolidate":
         return consolidate_main(rest)
     if cmd == "serve":

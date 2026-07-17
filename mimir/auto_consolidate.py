@@ -142,13 +142,21 @@ def maybe_trigger(log_path: Path, *, state_path: Optional[Path] = None,
         log.exception("mimir auto_consolidate failed to trigger (non-fatal)")
 
 
-def finish_run(state_path: Optional[Path] = None, lock_path: Optional[Path] = None) -> None:
-    """Called by the worker when a run completes, success or failure."""
+def finish_run(state_path: Optional[Path] = None, lock_path: Optional[Path] = None, *,
+               advance_baseline: bool = True) -> None:
+    """Called by the worker when a run completes, success or failure. Always updates
+    last_run_ts (so a persistently-failing environment backs off via cooldown instead of
+    retrying on every hook call) and always releases the lock. Only advances
+    failure_count_at_last_run when advance_baseline is True -- if consolidate_main
+    couldn't even start real work (e.g. missing bench dependency outside the repo tree),
+    leaving the baseline behind means the next eligible retry (after cooldown) tries
+    again instead of silently forgetting the accumulated failures forever."""
     path = state_path or DEFAULT_STATE
     lpath = lock_path or DEFAULT_LOCK
     try:
         state = _read_state(path)
-        state["failure_count_at_last_run"] = state.get("failure_count_total", 0)
+        if advance_baseline:
+            state["failure_count_at_last_run"] = state.get("failure_count_total", 0)
         state["last_run_ts"] = datetime.now(timezone.utc).isoformat()
         _write_state(path, state)
     except Exception:

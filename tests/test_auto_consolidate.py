@@ -202,3 +202,17 @@ def test_finish_run_releases_lock_even_if_state_write_fails(tmp_path):
     ac.finish_run(bad_state_path, lock_path)  # must not raise
 
     assert not lock_path.exists()
+
+
+def test_finish_run_updates_timestamp_but_not_baseline_when_advance_baseline_false(tmp_path):
+    state_path = tmp_path / "state.json"
+    lock_path = tmp_path / "lock"
+    lock_path.write_text("", encoding="utf-8")
+    _write_state_file(state_path, failure_count_total=7, failure_count_at_last_run=2)
+
+    ac.finish_run(state_path, lock_path, advance_baseline=False)
+
+    data = json.loads(state_path.read_text(encoding="utf-8"))
+    assert data["failure_count_at_last_run"] == 2  # unchanged -- failures stay pending
+    assert "last_run_ts" in data  # still updated, so cooldown still backs off retries
+    assert not lock_path.exists()  # lock still released
