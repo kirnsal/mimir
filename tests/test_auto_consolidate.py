@@ -97,3 +97,84 @@ def test_acquire_lock_backs_off_if_lock_refreshed_during_reclaim(tmp_path, monke
 
     assert ac._acquire_lock(lock_path) is False
     assert lock_path.exists()  # not stomped -- still the original file
+
+
+import sys
+
+
+class _FakePopen:
+    calls = []
+
+    def __init__(self, args, **kwargs):
+        _FakePopen.calls.append((args, kwargs))
+
+
+def test_maybe_trigger_spawns_worker_when_due_and_enabled(tmp_path, monkeypatch):
+    _FakePopen.calls = []
+    state_path = tmp_path / "state.json"
+    lock_path = tmp_path / "lock"
+    worker_log = tmp_path / "worker.log"
+    _write_state_file(state_path, failure_count_total=5, failure_count_at_last_run=0)
+    monkeypatch.delenv(ac.ENABLED_ENV, raising=False)
+
+    ac.maybe_trigger(tmp_path / "episodes.jsonl", state_path=state_path,
+                     lock_path=lock_path, worker_log_path=worker_log, popen=_FakePopen)
+
+    assert len(_FakePopen.calls) == 1
+    args, kwargs = _FakePopen.calls[0]
+    assert args == [sys.executable, "-m", "mimir.cli", "_auto-consolidate-worker"]
+    assert lock_path.exists()  # lock taken before spawn
+
+
+def test_maybe_trigger_does_nothing_when_disabled(tmp_path, monkeypatch):
+    _FakePopen.calls = []
+    state_path = tmp_path / "state.json"
+    _write_state_file(state_path, failure_count_total=5, failure_count_at_last_run=0)
+    monkeypatch.setenv(ac.ENABLED_ENV, "0")
+
+    ac.maybe_trigger(tmp_path / "episodes.jsonl", state_path=state_path,
+                     lock_path=tmp_path / "lock", worker_log_path=tmp_path / "worker.log",
+                     popen=_FakePopen)
+
+    assert _FakePopen.calls == []
+
+
+def test_maybe_trigger_does_nothing_when_not_due(tmp_path, monkeypatch):
+    _FakePopen.calls = []
+    state_path = tmp_path / "state.json"
+    _write_state_file(state_path, failure_count_total=2, failure_count_at_last_run=0)
+    monkeypatch.delenv(ac.ENABLED_ENV, raising=False)
+
+    ac.maybe_trigger(tmp_path / "episodes.jsonl", state_path=state_path,
+                     lock_path=tmp_path / "lock", worker_log_path=tmp_path / "worker.log",
+                     popen=_FakePopen)
+
+    assert _FakePopen.calls == []
+
+
+def test_maybe_trigger_does_nothing_when_lock_already_held(tmp_path, monkeypatch):
+    _FakePopen.calls = []
+    state_path = tmp_path / "state.json"
+    lock_path = tmp_path / "lock"
+    lock_path.write_text("", encoding="utf-8")  # fresh lock: a run is in flight
+    _write_state_file(state_path, failure_count_total=5, failure_count_at_last_run=0)
+    monkeypatch.delenv(ac.ENABLED_ENV, raising=False)
+
+    ac.maybe_trigger(tmp_path / "episodes.jsonl", state_path=state_path,
+                     lock_path=lock_path, worker_log_path=tmp_path / "worker.log",
+                     popen=_FakePopen)
+
+    assert _FakePopen.calls == []
+
+
+def test_maybe_trigger_never_raises_even_if_popen_blows_up(tmp_path, monkeypatch):
+    state_path = tmp_path / "state.json"
+    _write_state_file(state_path, failure_count_total=5, failure_count_at_last_run=0)
+    monkeypatch.delenv(ac.ENABLED_ENV, raising=False)
+
+    def _boom(*a, **k):
+        raise OSError("no python on PATH")
+
+    ac.maybe_trigger(tmp_path / "episodes.jsonl", state_path=state_path,
+                     lock_path=tmp_path / "lock", worker_log_path=tmp_path / "worker.log",
+                     popen=_boom)  # must not raise

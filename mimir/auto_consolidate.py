@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -110,3 +112,31 @@ def _acquire_lock(lock_path: Optional[Path] = None) -> bool:
         except FileNotFoundError:
             pass  # already gone; fall through to retry the create
         return _acquire_lock(path)
+
+
+def maybe_trigger(log_path: Path, *, state_path: Optional[Path] = None,
+                  lock_path: Optional[Path] = None, worker_log_path: Optional[Path] = None,
+                  popen=subprocess.Popen) -> None:
+    """Called after every hook invocation. Never raises -- matches run_hook's contract."""
+    try:
+        if os.environ.get(ENABLED_ENV, "1") == "0":
+            return
+        threshold = int(os.environ.get(THRESHOLD_ENV, DEFAULT_THRESHOLD))
+        cooldown_hours = float(os.environ.get(COOLDOWN_ENV, DEFAULT_COOLDOWN_HOURS))
+        if not is_due(state_path, threshold=threshold, cooldown_hours=cooldown_hours):
+            return
+        if not _acquire_lock(lock_path):
+            return
+        worker_log = worker_log_path or DEFAULT_WORKER_LOG
+        worker_log.parent.mkdir(parents=True, exist_ok=True)
+        with open(worker_log, "a", encoding="utf-8") as fh:
+            kwargs = dict(stdout=fh, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+            if sys.platform == "win32":
+                kwargs["creationflags"] = (
+                    subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+            else:
+                kwargs["start_new_session"] = True
+            popen([sys.executable, "-m", "mimir.cli", "_auto-consolidate-worker"], **kwargs)
+    except Exception:
+        log.exception("mimir auto_consolidate failed to trigger (non-fatal)")
