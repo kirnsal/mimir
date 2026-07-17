@@ -143,3 +143,22 @@ def test_hermes_call_exception_result_scored_as_fail():
 def test_hermes_call_error_dict_scored_as_fail():
     ep = from_hermes_call("execute_command", {}, {"error": "boom"})
     assert ep.outcome_score == OUTCOME_FAIL
+
+
+# --- auto_consolidate: bump failure counter on FAIL episodes ---
+
+from mimir.auto_consolidate import _read_state
+
+
+def test_capture_bumps_failure_counter_on_fail_episode(tmp_path):
+    log = tmp_path / "episodes.jsonl"
+    state_path = tmp_path / "state.json"
+    capture(_episode(outcome_score=0.0), log_path=log, state_path=state_path)
+    assert _read_state(state_path)["failure_count_total"] == 1
+
+
+def test_capture_does_not_bump_counter_on_pass_episode(tmp_path):
+    log = tmp_path / "episodes.jsonl"
+    state_path = tmp_path / "state.json"
+    capture(_episode(outcome_score=1.0), log_path=log, state_path=state_path)
+    assert not state_path.exists()

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
+from mimir.auto_consolidate import bump_failure_count
 from mimir.models import Episode
 
 log = logging.getLogger("mimir.capture")
@@ -85,7 +86,8 @@ def from_hermes_call(tool_name: str, params, result) -> Episode:
     )
 
 
-def capture(episode: Episode, *, log_path: Path) -> Optional[str]:
+def capture(episode: Episode, *, log_path: Path,
+           state_path: Optional[Path] = None) -> Optional[str]:
     """Append one EPISODE to the append-only JSONL log. Returns its id, or None on failure."""
     try:
         if not episode.id:
@@ -100,6 +102,8 @@ def capture(episode: Episode, *, log_path: Path) -> Optional[str]:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, sort_keys=True) + "\n")
+        if episode.outcome_score == OUTCOME_FAIL:
+            bump_failure_count(state_path)
         return episode.id
     except Exception:  # never propagate into the agent loop; no silent failure either
         log.exception("mimir.capture failed to append EPISODE (dropped, agent unaffected)")
