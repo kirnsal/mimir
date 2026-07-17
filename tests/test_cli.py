@@ -351,3 +351,40 @@ def test_hook_main_cline_calls_auto_consolidate_maybe_trigger(monkeypatch):
     monkeypatch.setattr(cli.sys, "stdin", io.StringIO(""))
     assert cli.hook_main_cline() == 0
     assert calls == [cli._log_path()]
+
+
+def test_auto_consolidate_worker_main_calls_consolidate_then_finish_run(monkeypatch):
+    import mimir.cli as cli
+
+    calls = []
+    monkeypatch.setattr(cli, "consolidate_main", lambda *a, **k: calls.append("consolidate") or 0)
+    monkeypatch.setattr(cli.auto_consolidate, "finish_run", lambda: calls.append("finish"))
+    assert cli._auto_consolidate_worker_main() == 0
+    assert calls == ["consolidate", "finish"]
+
+
+def test_auto_consolidate_worker_main_still_finishes_when_consolidate_raises(monkeypatch):
+    import mimir.cli as cli
+
+    calls = []
+
+    def _boom(*a, **k):
+        raise RuntimeError("judge unreachable")
+
+    monkeypatch.setattr(cli, "consolidate_main", _boom)
+    monkeypatch.setattr(cli.auto_consolidate, "finish_run", lambda: calls.append("finish"))
+    try:
+        cli._auto_consolidate_worker_main()
+        assert False, "the worker's own crash should propagate to its process exit code"
+    except RuntimeError:
+        pass
+    assert calls == ["finish"]  # cleanup still ran despite the crash
+
+
+def test_main_dispatches_auto_consolidate_worker_command(monkeypatch):
+    import mimir.cli as cli
+
+    calls = []
+    monkeypatch.setattr(cli, "_auto_consolidate_worker_main", lambda: calls.append(True) or 0)
+    assert cli.main(["_auto-consolidate-worker"]) == 0
+    assert calls == [True]

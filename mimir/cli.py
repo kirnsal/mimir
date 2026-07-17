@@ -311,6 +311,17 @@ def consolidate_main(argv: Optional[list] = None, *, judge: Optional[Callable] =
     return 0
 
 
+def _auto_consolidate_worker_main(argv: Optional[list] = None) -> int:
+    """Spawned by auto_consolidate.maybe_trigger as a detached background process; not a
+    user-facing command (deliberately absent from the module docstring/usage text). Runs
+    the same consolidate_main() as `mimir consolidate`, then always updates the
+    auto-trigger state and releases the lock, even if consolidation itself raised."""
+    try:
+        return consolidate_main()
+    finally:
+        auto_consolidate.finish_run()
+
+
 def serve_main(argv: Optional[list] = None) -> int:
     """`mimir-serve` — serve the MCP tool surface over stdio, on the LanceDB store."""
     _ensure_utf8_stdio()
@@ -384,6 +395,8 @@ def main(argv: Optional[list] = None) -> int:
         return export_main(rest)
     if cmd == "hook":
         return hook_main(rest)
+    if cmd == "_auto-consolidate-worker":
+        return _auto_consolidate_worker_main()
     print(f"unknown command: {cmd}\n{__doc__}", file=sys.stderr)
     return 2
 
