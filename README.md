@@ -74,15 +74,20 @@ The unit of memory:
 
 - **You install it once.** The hook logs failures in the background; you
   never think about it again during a normal session.
-- **You run `mimir consolidate` when you want the last batch of failures
-  turned into lessons** — after a rough session, at the end of the day,
-  or on a cron job. It's a deliberate step, not a black box.
+- **Consolidation happens on its own.** Once enough new failures pile up
+  (5 by default) and enough time has passed since the last run (4 hours
+  by default), the next hook call quietly spawns a background
+  `mimir consolidate` for you — no command to remember. Run
+  `mimir consolidate` yourself any time for an on-demand pass, or set
+  `MIMIR_AUTO_CONSOLIDATE=0` to go back to fully manual.
 - **From then on, recall is automatic.** Every session after that, the
   agent pulls in whatever lessons actually clear the bar for the context
   it's in — you don't ask for it, you just notice fewer repeat mistakes.
 - **You can always audit why.** Every lesson traces back to the specific
-  failure and the benchmark that proved it helped — `mimir.forget` retires
-  one instantly if it ever stops earning its keep.
+  failure and the benchmark that proved it helped, and every
+  auto-consolidate run is logged to `~/.mimir/auto_consolidate.log` —
+  `mimir.forget` retires a lesson instantly if it ever stops earning its
+  keep.
 
 ---
 
@@ -121,7 +126,8 @@ mimir install-hook          # idempotent; --print to paste the block yourself
 
 # 2. Work normally. Failures get logged to ~/.mimir/episodes.jsonl.
 
-# 3. Consolidate: distill logged failures into gated, signed lessons
+# 3. Consolidate: happens automatically in the background once enough
+#    failures pile up (see "day to day" below) -- or run it yourself:
 mimir consolidate
 
 # 4. Serve: gated recall over MCP (stdio), backed by the same store
