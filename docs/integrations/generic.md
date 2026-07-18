@@ -34,7 +34,9 @@ Each `*_path` is a dotted path into your tool's JSON payload
 unreachable paths resolve to an empty string for
 `action`/`session_id`/`task_id`. The outcome is `FAIL` when the value at
 `outcome_path` is a member of `fail_values`; anything else (including an
-unresolved path) is `PASS`.
+unresolved path) is `PASS`. `fail_values` must be a JSON array, even for a
+single value (`["error"]`, not `"error"`) — a bare string is matched as a
+substring test, not an exact match.
 
 **Limitations:** dict traversal only (no `items.0.status` list indexing);
 one `outcome_path` plus one `fail_values` list (no combining multiple

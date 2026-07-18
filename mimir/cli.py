@@ -269,7 +269,7 @@ def hook_main(argv: Optional[list] = None) -> int:
     config_path = _extract_flag_value(args, "--config") or os.environ.get(HOOK_CONFIG_ENV)
     if config_path:
         try:
-            config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+            config = json.loads(Path(config_path).expanduser().read_text(encoding="utf-8"))
             mapper = from_config_hook(config)
         except Exception:
             log.exception(

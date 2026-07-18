@@ -410,6 +410,23 @@ def test_hook_main_uses_config_mapper_from_env_var(tmp_path, monkeypatch):
     assert row["action"] == "foo.run"
 
 
+def test_hook_main_expands_tilde_in_config_path(tmp_path, monkeypatch):
+    import mimir.cli as cli
+
+    log = tmp_path / "episodes.jsonl"
+    config_path = tmp_path / "foo.json"
+    config_path.write_text(json.dumps({"action_path": "tool_name"}), encoding="utf-8")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Windows expanduser() checks this
+    monkeypatch.setenv("MIMIR_EPISODE_LOG", str(log))
+    monkeypatch.setattr(cli.auto_consolidate, "maybe_trigger", lambda log_path: None)
+    monkeypatch.setattr(cli.sys, "stdin", io.StringIO(json.dumps({"tool_name": "foo.run"})))
+    rc = cli.hook_main(["--config", "~/foo.json"])
+    assert rc == 0
+    row = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+    assert row["action"] == "foo.run"
+
+
 def test_hook_main_skips_capture_on_malformed_config(tmp_path, monkeypatch, caplog):
     import mimir.cli as cli
 
