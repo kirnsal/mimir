@@ -152,6 +152,10 @@ Hermes' `config.yaml`). New integrations, schemas not yet verified against a
 live session; [open an issue](https://github.com/kirnsal/mimir/issues) if
 something doesn't map correctly.
 
+**Anything else:** if your tool can run a shell command with JSON on
+stdin, `mimir hook --config <path>` plugs it in without touching Mimir's
+code — see [docs/integrations/generic.md](docs/integrations/generic.md).
+
 ---
 
 ## Semantic storage
