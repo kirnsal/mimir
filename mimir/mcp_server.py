@@ -92,6 +92,16 @@ def recall(store, query: str, *, tau: float = TAU, k: int = DEFAULT_K,
     )
 
 
+def _has_active_lessons(store) -> bool:
+    """Cheap pre-check for build_tools(): is there anything for mimir.recall
+    to ever return? Fails open (True) on a store error -- this check must
+    never be the reason a working capability silently disappears."""
+    try:
+        return bool(store.active())
+    except Exception:
+        return True
+
+
 # --- MCP tool surface --------------------------------------------------------
 
 @dataclass
@@ -182,52 +192,55 @@ def build_tools(store, *, tau: float = TAU,
                 consolidate_judge: Optional[Callable] = None,
                 consolidate_probe: Optional[Callable] = None) -> dict[str, Tool]:
     """The MCP tool surface (BUILD_SPEC C4): remember (capture) / memify (consolidate)
-    / recall / forget, all live. `recall` and `forget` are always live; `capture`
-    and `consolidate` go live when `log_path` is given (where EPISODEs are
-    appended/read). `attribute` stays declared-only — it needs an injected solver
-    callable, bound only inside the C5 benchmark harness."""
-    return {
-        "mimir.recall": Tool(
+    / recall / forget, all live. `recall` is live but only exposed when the store has
+    active lessons to return (retrieval gate -- skips a guaranteed-empty round-trip,
+    e.g. right after install before consolidate has ever run); `forget` is always
+    live. `capture` and `consolidate` go live when `log_path` is given (where
+    EPISODEs are appended/read). `attribute` stays declared-only — it needs an
+    injected solver callable, bound only inside the C5 benchmark harness."""
+    tools: dict[str, Tool] = {}
+    if _has_active_lessons(store):
+        tools["mimir.recall"] = Tool(
             name="mimir.recall",
             description="Confidence-gated recall of active LESSONs relevant to a query (FR5).",
             input_schema=_schema({"query": {"type": "string"}}, ["query"]),
             handler=lambda query: recall(store, query, tau=tau),
+        )
+    tools["mimir.attribute"] = Tool(
+        name="mimir.attribute",
+        description="Single-lesson counterfactual credit for a task (runs in the C5 harness).",
+        input_schema=_schema(
+            {"task": {"type": "string"}, "lesson_id": {"type": "string"}},
+            ["task", "lesson_id"],
         ),
-        "mimir.attribute": Tool(
-            name="mimir.attribute",
-            description="Single-lesson counterfactual credit for a task (runs in the C5 harness).",
-            input_schema=_schema(
-                {"task": {"type": "string"}, "lesson_id": {"type": "string"}},
-                ["task", "lesson_id"],
-            ),
+    )
+    tools["mimir.capture"] = Tool(
+        name="mimir.capture",
+        description="Append a raw EPISODE (fast path, C1). Hooks normally fire this.",
+        input_schema=_schema(
+            {"action": {"type": "string"}, "context": {"type": "string"},
+             "consequence": {"type": "string"},
+             "outcome_score": {"type": "number"},
+             "recalled_lesson_ids": {"type": "array", "items": {"type": "string"}}},
+            ["action"],
         ),
-        "mimir.capture": Tool(
-            name="mimir.capture",
-            description="Append a raw EPISODE (fast path, C1). Hooks normally fire this.",
-            input_schema=_schema(
-                {"action": {"type": "string"}, "context": {"type": "string"},
-                 "consequence": {"type": "string"},
-                 "outcome_score": {"type": "number"},
-                 "recalled_lesson_ids": {"type": "array", "items": {"type": "string"}}},
-                ["action"],
-            ),
-            handler=_capture_handler(log_path) if log_path is not None else None,
-        ),
-        "mimir.consolidate": Tool(
-            name="mimir.consolidate",
-            description="memify: distill logged failure EPISODEs into judged, ε-gated, "
-                        "HMAC-signed LESSONs and persist them (C2).",
-            input_schema=_schema({}, []),
-            handler=_consolidate_handler(store, log_path,
-                                        judge=consolidate_judge,
-                                        probe=consolidate_probe)
-                    if log_path is not None else None,
-        ),
-        "mimir.forget": Tool(
-            name="mimir.forget",
-            description="forget: retire a LESSON for good. Bi-temporal — the prior version "
-                        "stays on record (FR7 audit trail), but it's excluded from recall.",
-            input_schema=_schema({"lesson_id": {"type": "string"}}, ["lesson_id"]),
-            handler=_forget_handler(store),
-        ),
-    }
+        handler=_capture_handler(log_path) if log_path is not None else None,
+    )
+    tools["mimir.consolidate"] = Tool(
+        name="mimir.consolidate",
+        description="memify: distill logged failure EPISODEs into judged, ε-gated, "
+                    "HMAC-signed LESSONs and persist them (C2).",
+        input_schema=_schema({}, []),
+        handler=_consolidate_handler(store, log_path,
+                                    judge=consolidate_judge,
+                                    probe=consolidate_probe)
+                if log_path is not None else None,
+    )
+    tools["mimir.forget"] = Tool(
+        name="mimir.forget",
+        description="forget: retire a LESSON for good. Bi-temporal — the prior version "
+                    "stays on record (FR7 audit trail), but it's excluded from recall.",
+        input_schema=_schema({"lesson_id": {"type": "string"}}, ["lesson_id"]),
+        handler=_forget_handler(store),
+    )
+    return tools

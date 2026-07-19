@@ -88,6 +88,26 @@ def test_tool_surface_validates_and_recall_is_wired():
     assert res.lessons
 
 
+def test_recall_tool_omitted_when_store_has_no_active_lessons():
+    tools = M.build_tools(_store())  # empty store, no active lessons
+    assert "mimir.recall" not in tools
+
+
+def test_recall_tool_present_when_store_has_active_lessons():
+    store = _store(_lesson("use backoff on 429"))
+    tools = M.build_tools(store)
+    assert "mimir.recall" in tools
+
+
+def test_recall_tool_present_when_active_lessons_check_raises():
+    class _BoomStore:
+        def active(self):
+            raise RuntimeError("store unavailable")
+
+    tools = M.build_tools(_BoomStore())
+    assert "mimir.recall" in tools
+
+
 def test_capture_tool_is_live_when_log_path_given(tmp_path):
     import json
     log = tmp_path / "episodes.jsonl"
