@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/kirnsal/mimir/actions/workflows/tests.yml"><img src="https://github.com/kirnsal/mimir/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
 </p>
@@ -26,11 +27,11 @@ message, every guess — and hoping that helps next time. Most of the time it
 doesn't. It just makes retrieval slower.
 
 Mimir does the opposite. It watches your agent fail, turns that failure into
-one specific, testable lesson — think of it like a skill your agent actually
-earns, not a memory dump — and only keeps it if a real before/after benchmark
-*proves* the agent performs measurably better with it. No proof, no lesson.
-Ever. And every lesson it does keep is HMAC-signed and traceable back to the
-failure that created it, so nothing gets into your agent's head without a
+one specific, testable lesson — a skill your agent actually *earns*, not a
+memory dump — and keeps it only if a real before/after benchmark *proves*
+the agent performs measurably better with it. No proof, no lesson. Ever.
+Every lesson that does survive is HMAC-signed and traceable back to the
+failure that created it, so nothing enters your agent's context without a
 paper trail.
 
 Install it once. Capture runs quietly in the background of every Claude Code
@@ -38,8 +39,8 @@ session — it never blocks, never raises. From then on your agent gets
 sharper the more you use it, and you can always see exactly which lesson
 fixed which mistake.
 
-> Status: **v0.0.1 — in active development.** The lifecycle below works
-> end-to-end; interfaces will still move.
+> **v0.1.0.** The full lifecycle — capture, consolidate, recall, forget —
+> works end-to-end and is covered by CI. Pre-1.0: interfaces can still move.
 
 ---
 
@@ -127,7 +128,7 @@ mimir install-hook          # idempotent; --print to paste the block yourself
 # 2. Work normally. Failures get logged to ~/.mimir/episodes.jsonl.
 
 # 3. Consolidate: happens automatically in the background once enough
-#    failures pile up (see "day to day" below) -- or run it yourself:
+#    failures pile up (see "day to day" above) -- or run it yourself:
 mimir consolidate
 
 # 4. Serve: gated recall over MCP (stdio), backed by the same store
@@ -161,10 +162,11 @@ code — see [docs/integrations/generic.md](docs/integrations/generic.md).
 ## Semantic storage
 
 Semantic storage and retrieval run directly on [LanceDB](https://github.com/lancedb/lancedb)
-(`mimir/store_semantic.py`). Lessons are embedded and recalled through a thin,
-swappable `VectorIndex` seam (LanceDB for a real on-disk store, or a
-zero-dependency in-process cosine index); the persisted LESSON objects remain
-the source of truth and the vector index is rebuilt from them on load.
+(`mimir/store_semantic.py`) — no framework in between, just a thin, swappable
+`VectorIndex` seam (LanceDB for a real on-disk store, or a zero-dependency
+in-process cosine index for tests and low-footprint runs). The persisted
+LESSON objects remain the source of truth; the vector index is a derived
+cache, rebuilt from them on load.
 
 The default embedder is a dependency-free token-hashing bag-of-words (good
 enough for shared-vocabulary matches, zero install cost). For real semantic
@@ -196,7 +198,9 @@ Code included) can drive it directly:
 - `mimir.consolidate` (**memify**) — distill logged failures into judged, ε-gated,
   HMAC-signed lessons in the LanceDB-backed store
 - `mimir.recall` (**recall**) — confidence-gated, semantically-ranked lesson
-  retrieval for the current context
+  retrieval for the current context. Not exposed at all when there's nothing
+  to recall yet (e.g. right after install, before the first consolidate) —
+  no wasted round-trip on a call that could only ever come back empty.
 - `mimir.forget` (**forget**) — retire a lesson for good; bi-temporal, so the
   prior version stays on record for audit but is excluded from recall
 
@@ -223,10 +227,12 @@ issue? See [SECURITY.md](SECURITY.md) rather than opening a public issue.
 
 ---
 
-## Hackathon note
+## How this was built
 
-Developed with Claude Code (Anthropic) as an AI coding assistant, under human
-direction and review.
+Built with Claude Code (Anthropic) as an AI coding assistant, under human
+direction and review — including its own design specs and implementation
+plans, kept in [`docs/superpowers/`](docs/superpowers/) as a transparency
+trail, not required reading to use Mimir.
 
 ## License
 
