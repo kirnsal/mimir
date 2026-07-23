@@ -4,7 +4,7 @@ Thanks for considering contributing — every bit of help matters.
 
 ## Ways to contribute
 
-- Report bugs or suggest features via [GitHub Issues](https://github.com/kirnsal/mimir/issues)
+- Report bugs or suggest features via [GitHub Issues](https://github.com/kirrns/mimir/issues)
 - Improve documentation
 - Contribute code or tests
 - Review open pull requests
@@ -12,7 +12,7 @@ Thanks for considering contributing — every bit of help matters.
 ## Getting started
 
 ```bash
-git clone https://github.com/kirnsal/mimir && cd mimir
+git clone https://github.com/kirrns/mimir && cd mimir
 pip install -e '.[dev,mcp,embed]'
 pytest
 ```

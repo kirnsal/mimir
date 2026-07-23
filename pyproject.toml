@@ -6,9 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "mimir-agent-memory"
 version = "0.1.0"
 description = "A developer-facing memory layer for AI agents (MCP server)."
+readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/kirrns/mimir"
+Repository = "https://github.com/kirrns/mimir"
+Issues = "https://github.com/kirrns/mimir/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

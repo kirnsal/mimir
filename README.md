@@ -5,13 +5,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/kirnsal/mimir/actions/workflows/tests.yml"><img src="https://github.com/kirnsal/mimir/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/kirrns/mimir/actions/workflows/tests.yml"><img src="https://github.com/kirrns/mimir/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
 </p>
 
 <p align="center">
-  <a href="https://github.com/kirnsal/mimir/issues">Issues</a> ·
+  <a href="https://github.com/kirrns/mimir/issues">Issues</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="CODE_OF_CONDUCT.md">Code of Conduct</a> ·
   <a href="SECURITY.md">Security</a> ·
@@ -169,7 +169,7 @@ failures the same way, and `hermes_memory_plugin/` goes further — it
 registers Mimir as an actual Hermes `MemoryProvider`, so `mimir.recall`
 serves lessons straight into Hermes' prompt (`memory.provider: mimir` in
 Hermes' `config.yaml`). New integrations, schemas not yet verified against a
-live session; [open an issue](https://github.com/kirnsal/mimir/issues) if
+live session; [open an issue](https://github.com/kirrns/mimir/issues) if
 something doesn't map correctly.
 
 **Anything else:** if your tool can run a shell command with JSON on
@@ -231,7 +231,7 @@ it needs an injected solver callable, bound only inside the C5 benchmark harness
 ## Development
 
 ```bash
-git clone https://github.com/kirnsal/mimir && cd mimir
+git clone https://github.com/kirrns/mimir && cd mimir
 pip install -e '.[dev,mcp]'
 pytest
 ```
